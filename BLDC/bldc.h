@@ -1,5 +1,5 @@
-#ifndef __E_MOTOR_H
-#define __E_MOTOR_H
+#ifndef __BLDC_H
+#define __BLDC_H
 
 #include "tim.h"
 
