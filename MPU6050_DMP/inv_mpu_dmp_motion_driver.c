@@ -23,10 +23,6 @@
 #include "inv_mpu_dmp_motion_driver.h"
 #include "dmpKey.h"
 #include "dmpmap.h"
-#include "usart.h"
-
-
-#define  MOTION_DRIVER_TARGET_MSP430
 
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
@@ -36,13 +32,13 @@
  * delay_ms(unsigned long num_ms)
  * get_ms(unsigned long *count)
  */
-#if defined MOTION_DRIVER_TARGET_MSP430
-//#include "msp430.h"
-//#include "msp430_clock.h"
-#define delay_ms    delay_ms
-#define get_ms      mget_ms
-#define log_i 		printf
-#define log_e  		printf
+#if defined STM32_MPU6050
+#include "i2c.h"
+//#include "cmsis_os.h"
+#define delay_ms    HAL_Delay
+#define get_ms(p)      do{ *p = HAL_GetTick();}while(0)
+#define log_i(...)     do {} while (0)
+#define log_e(...)     do {} while (0)
 
 #elif defined EMPL_TARGET_MSP430
 #include "msp430.h"
@@ -488,22 +484,13 @@ struct dmp_s {
     unsigned char packet_length;
 };
 
-//static struct dmp_s dmp = {
-//    .tap_cb = NULL,
-//    .android_orient_cb = NULL,
-//    .orient = 0,
-//    .feature_mask = 0,
-//    .fifo_rate = 0,
-//    .packet_length = 0
-//};
-
-static struct dmp_s dmp={
-  NULL,
-  NULL,
-  0,
-  0,
-  0,
-  0
+static struct dmp_s dmp = {
+    .tap_cb = NULL,
+    .android_orient_cb = NULL,
+    .orient = 0,
+    .feature_mask = 0,
+    .fifo_rate = 0,
+    .packet_length = 0
 };
 
 /**
@@ -639,8 +626,8 @@ int dmp_set_accel_bias(long *bias)
 
     mpu_get_accel_sens(&accel_sens);
     accel_sf = (long long)accel_sens << 15;
-    //__no_operation();
-
+    // __no_operation();
+    __NOP();
     accel_bias_body[0] = bias[dmp.orient & 3];
     if (dmp.orient & 4)
         accel_bias_body[0] *= -1;
