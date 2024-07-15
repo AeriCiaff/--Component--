@@ -3,6 +3,20 @@
 #include "inv_mpu.h"
 #include "inv_mpu_dmp_motion_driver.h"
 #include "math.h"
+#include "stm32f4xx_hal.h"
+
+#define q30  1073741824.0f	//用于转换四元组数据
+#define q16  65536.0f //用于转换温度数据
+
+struct MPU6050_Data
+{
+	short gyro[3];
+	short accel[3];
+	float temp;
+	float pitch;
+	float roll;
+	float yaw;
+}MPU6050Sensor_Data;
 
 /* The sensors can be mounted onto the board in any orientation. The mounting
  * matrix seen below tells the MPL how to rotate the raw data from thei
@@ -161,31 +175,71 @@ int MPU6050_DMP_Init(void)
     return 0;
 }
 
-int MPU6050_DMP_GetData(float *pitch, float *roll, float *yaw)
+int MPU6050_DMP_GetData(float *pitch, float *roll, float *yaw_z, float* Temp)
 {
     float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
     short gyro[3];
     short accel[3];
     long quat[4];
+		float yaw;
     unsigned long timestamp;
+		unsigned long sensor_timestamp;
+		long temperature;
     short sensors;
     unsigned char more;
     if(dmp_read_fifo(gyro, accel, quat, &timestamp, &sensors, &more))
     {
         return -1;
     }
+		
+		if(sensors & INV_XYZ_GYRO)
+    {
+        /* Temperature only used for gyro temp comp. */
+        mpu_get_temperature(&temperature, &sensor_timestamp);
+        *Temp = temperature / q16; //温度数据为q16格式
+        MPU6050Sensor_Data.gyro[0] = gyro[0];
+				MPU6050Sensor_Data.gyro[1] = gyro[1];
+				MPU6050Sensor_Data.gyro[2] = gyro[2];
+    }
+    else return 2;
+		
+		if(sensors & INV_XYZ_ACCEL) //加速度
+    {
+        MPU6050Sensor_Data.accel[0] = accel[0];	
+        MPU6050Sensor_Data.accel[1] = accel[1];	
+        MPU6050Sensor_Data.accel[2] = accel[2];	
+
+    }
 
     if(sensors & INV_WXYZ_QUAT)
     {
-        q0 = quat[0] / Q30;
-        q1 = quat[1] / Q30;
-        q2 = quat[2] / Q30;
-        q3 = quat[3] / Q30;
+        q0 = quat[0] / q30;
+        q1 = quat[1] / q30;
+        q2 = quat[2] / q30;
+        q3 = quat[3] / q30;
 
         *pitch = asin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3; // pitch
         *roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1) * 57.3; // roll
-        *yaw = atan2(2 * (q0 * q3 + q1 * q2), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 57.3; // yaw
+        yaw = atan2(2 * (q0 * q3 + q1 * q2), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 57.3; // yaw
+			
+				if(HAL_GetTick() < 21075)
+				{
+					*yaw_z = yaw + (0.0001 * HAL_GetTick()) - 0.0923;
+				}
+				if(HAL_GetTick() > 21075)
+				{
+					*yaw_z = yaw - (0.000004 * HAL_GetTick()) + 2.208;
+				}
     }
 
     return 0;
+}
+
+void MPU6050_Init()
+{
+	int ret = 0;
+	do{
+		ret = MPU6050_DMP_Init();
+		HAL_Delay(1000);
+	}while(ret);
 }

@@ -109,7 +109,8 @@
 #define Q30  1073741824.0f
 
 int MPU6050_DMP_Init(void);
-int MPU6050_DMP_GetData(float *pitch, float *roll, float *yaw);
+int MPU6050_DMP_GetData(float *pitch, float *roll, float *yaw_z, float* Temp);
+void MPU6050_Init();
 
 #endif
 
